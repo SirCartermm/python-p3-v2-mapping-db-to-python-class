@@ -1,143 +1,92 @@
-#lib/depertment.py
+import sqlite3
 
-from __init__ import CURSOR, CONN
-
-
-class Depertment:
-    
-    # Dictionary of object saved to the database.
+class Department:
     all = {}
 
-    def __init__(self, name, location, id:None):
-        self.id = id
+    def __init__(self, name, location):
         self.name = name
         self.location = location
-    
+        self.id = None
 
     def __repr__(self):
-        return f"<Department {self.id}: {self.id}: {self.name},{self.location}>"
-    
+        return f"Department('{self.name}', '{self.location}')"
 
     @classmethod
     def create_table(cls):
-        "'" Create a new table to persit the attributes of Department instance "'"
-        sql = """
-             CREATE TABLE IF NOT EXISTS departments (
-             id INTERGER PRIMARY KEY ,
-             name TEXT,
-             location TEXT)
-         """
-        CURSOR.execute(sql)
-        CONN.commit()
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS departments (
+                id INTEGER PRIMARY KEY,
+                name TEXT,
+                location TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
 
-        @classmethod
-        def drop_table(cls):
-            """ DROP the table tha persists Department instances """
-            sql = """
-                DROP TABLE IF EXISTS departments;
-            """
-            CURSOR.execute(sql)
-            CONN.commit()
+    @classmethod
+    def drop_table(cls):
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("DROP TABLE IF EXISTS departments")
+        conn.commit()
+        conn.close()
 
-        def save(self):
-            """  Insert a new row with the name and location values of the current Department instance.
-            update object id attribute using the primary key value of the current Department instances.
-            save the object in local dictionary using table row's PK as dictionary key """
-            sql = """
-                  INSERT INTO departments (name, location)
-                  VALUES (?, ?)
-             """
-            
-            CURSOR.execute(sql, (self.name, self.location))
-            CONN.COMMIT()
+    @classmethod
+    def new_department(cls, name, location):
+        department = cls(name, location)
+        department.save()
+        return department
 
-            self.id = CURSOR.lastrowid
-            type(self).all[self.all[self.id] = self
-                           
-        @classmethod
-        def create(cls, name, location):
-              """ Initialize a new Department instance and save the object to the database  """
-              department  # cls(name, location)
-              department.save()
-              return department 
+    def save(self):
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        if self.id is None:
+            cursor.execute("""
+                INSERT INTO departments (name, location)
+                VALUES (?, ?)
+            """, (self.name, self.location))
+            self.id = cursor.lastrowid
+        else:
+            cursor.execute("""
+                UPDATE departments
+                SET name = ?, location = ?
+                WHERE id = ?
+            """, (self.name, self.location, self.id))
+        conn.commit()
+        conn.close()
 
-        def update(self):
-              """Update the table row corresponding to the current Department instance."""
-              sql = """
-                   UPDATE departments
-                   SET name = ?, location = ?
-                   WHERE id = ?
-            """
-            CURSOR.execute(sql, (self.name, self.location, self.id))
-            CONN.commit()
+    @classmethod
+    def instance_from_db(cls, row):
+        department = cls(row[1], row[2])
+        department.id = row[0]
+        cls.all[department.id] = department
+        return department
 
-        def delete(self):
-        """Delete the table row corresponding to the current Department instance,
-        delete the dictionary entry, and reasssign id attribute"""
+    @classmethod
+    def get_all(cls):
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM departments")
+        rows = cursor.fetchall()
+        conn.close()
+        return [cls.instance_from_db(row) for row in rows]
 
-
-        sql = """
-DELETE FROM departments
-WHERE id = ?
-  """
-
-  # Delete the dictionary entry using id as the key
-  del type(self).all[self.id]
-
-  # Set the id to None
-  self.id = None
-
-@classmethod
-def instance_from_db(cls, row):
- """Return a Department object having the attribute values from the table row."""
-
-
- # check th dictionary for an existing instance using the row's primary key
-  department = cls.all.get(row[0])
-  if department:
-  department.name = row[1]
-  department.location - row[2]
-else:
-    # not in dictionary, create new instance and add to dictionary 
-    department = cls(row[1, row[2]])
-    department.id = row[0]
-    cls.all[department.id] = department
-return department
-
-@classmethod
-def get_all(cls):
- """Return a list containing a Department object per row in the table"""
- sql = """
- SELECT *
- FROM departments
- 
- """
-
- rows = CURSOR.execute(sql).fetchall()
-
- return [cls.instance_from_db(row) for row in rows]
-
-
-@classmethod
-def find_by_id(cls, id):
-     """Return a Department object corresponding to the table row matching the specified primary key"""
-     sql = """
-          SELECT *
-          FROM departments
-          WHERE id = ?
-        """ CURSOR.execute(sql, (id,)).fetchone()
+    @classmethod
+    def find_by_id(cls, id):
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM departments WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
         return cls.instance_from_db(row) if row else None
 
-
-@classmethod
-def find_by_name(cls, name):
-"""Return a Department object corresponding to first table row matching specified name """
-sql = """
-    SELECT *
-    FROM departments
-    WHERE name is ?
-"""
-
-row = CURSOR.execute(sql, (name,)).fetchone()
-return cls.instance_from_db(row) if row else None
-
+    @classmethod
+    def find_by_name(cls, name):
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM departments WHERE name = ?", (name,))
+        row = cursor.fetchone()
+        conn.close()
+        return cls.instance_from_db(row) if row else None
